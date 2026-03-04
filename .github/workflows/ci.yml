@@ -18,11 +18,13 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install build-essential cmake pkgconf python3 libevent-dev libboost-dev capnproto libcapnp-dev
-      - name: Checkout Bitcoin Core v30.0
-        run: git clone --depth 1 --branch 30.x https://github.com/bitcoin/bitcoin.git
-      - name: Build and Install Bitcoin Core
-        run: cd bitcoin && cmake -B build -DENABLE_IPC=ON -DENABLE_WALLET=OFF && cmake --build build -j 16
+      - name: Checkout Bitcoin Core
+        run: git clone --depth 1 --branch master https://github.com/bitcoin/bitcoin.git
+      - name: Build Bitcoin Core
+        run: cd bitcoin && cmake -B build -DENABLE_WALLET=OFF -DBUILD_TESTS=OFF && cmake --build build -j 16
       - name: Run Bitcoin Core Daemon
-        run: cd bitcoin && ./build/bin/bitcoin-node -chain=regtest -ipcbind=unix -debug=ipc -daemon
+        run: cd bitcoin && ./build/bin/bitcoin node -chain=regtest -ipcbind=unix -server -debug=ipc -daemon
+      - name: Generate Blocks
+        run: cd bitcoin && ./build/bin/bitcoin rpc -regtest -rpcwait generatetodescriptor 101 "raw(51)"
       - name: Run Test Suite
         run: cargo test
