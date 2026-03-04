@@ -39,33 +39,41 @@ async fn connect_unix_stream(
     VatNetwork::new(buf_reader, buf_writer, Side::Client, Default::default())
 }
 
+/// Bootstrap an Init client, spawn the RPC system, and create a thread handle.
+async fn bootstrap(
+    mut rpc_system: RpcSystem<capnp_rpc::rpc_twoparty_capnp::Side>,
+) -> (init::Client, thread::Client) {
+    let client: init::Client = rpc_system.bootstrap(Side::Server);
+    tokio::task::spawn_local(rpc_system);
+    let create_client_response = client
+        .construct_request()
+        .send()
+        .promise
+        .await
+        .expect("could not create initial request");
+    let thread_map: thread_map::Client = create_client_response
+        .get()
+        .unwrap()
+        .get_thread_map()
+        .unwrap();
+    let thread_reponse = thread_map
+        .make_thread_request()
+        .send()
+        .promise
+        .await
+        .unwrap();
+    let thread: thread::Client = thread_reponse.get().unwrap().get_result().unwrap();
+    (client, thread)
+}
+
 #[tokio::test]
 async fn integration() {
     let path = unix_socket_path();
     let rpc_network = connect_unix_stream(path).await;
-    let mut rpc_system = RpcSystem::new(Box::new(rpc_network), None);
+    let rpc_system = RpcSystem::new(Box::new(rpc_network), None);
     LocalSet::new()
         .run_until(async move {
-            let client: init::Client = rpc_system.bootstrap(Side::Server);
-            tokio::task::spawn_local(rpc_system);
-            let create_client_response = client
-                .construct_request()
-                .send()
-                .promise
-                .await
-                .expect("could not create initial request");
-            let thread_map: thread_map::Client = create_client_response
-                .get()
-                .unwrap()
-                .get_thread_map()
-                .unwrap();
-            let thread_reponse = thread_map
-                .make_thread_request()
-                .send()
-                .promise
-                .await
-                .unwrap();
-            let thread: thread::Client = thread_reponse.get().unwrap().get_result().unwrap();
+            let (client, thread) = bootstrap(rpc_system).await;
             let mut echo = client.make_echo_request();
             echo.get().get_context().unwrap().set_thread(thread.clone());
             let echo_client_request = echo.send().promise.await.unwrap();
