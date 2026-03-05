@@ -82,6 +82,7 @@ async fn bootstrap(
 }
 
 #[tokio::test]
+#[serial_test::parallel]
 async fn integration() {
     let path = unix_socket_path();
     let rpc_network = connect_unix_stream(path).await;
@@ -117,6 +118,7 @@ async fn integration() {
 /// server. Cap'n Proto requires sequential ordinals so this placeholder cannot
 /// be removed, but the server intentionally rejects it.
 #[tokio::test]
+#[serial_test::parallel]
 async fn make_mining_old2_rejected() {
     let path = unix_socket_path();
     let rpc_network = connect_unix_stream(path).await;
@@ -169,6 +171,7 @@ async fn destroy_template(template: &block_template::Client, thread: &thread::Cl
 
 /// Check the four mining constants from the capnp schema.
 #[test]
+#[serial_test::parallel]
 fn mining_constants() {
     assert_eq!(mining_capnp::MAX_MONEY, 2_100_000_000_000_000i64);
     const { assert!(mining_capnp::MAX_DOUBLE > 1e300) };
@@ -181,6 +184,7 @@ fn mining_constants() {
 
 /// isTestChain, isInitialBlockDownload, getTip.
 #[tokio::test]
+#[serial_test::parallel]
 async fn mining_basic_queries() {
     let path = unix_socket_path();
     let rpc_network = connect_unix_stream(path).await;
@@ -218,6 +222,8 @@ async fn mining_basic_queries() {
 
 /// waitTipChanged with a short timeout.
 #[tokio::test]
+// Serialized because this assertion is sensitive to concurrent tip changes.
+#[serial_test::serial]
 async fn mining_wait_tip_changed() {
     let path = unix_socket_path();
     let rpc_network = connect_unix_stream(path).await;
@@ -252,6 +258,7 @@ async fn mining_wait_tip_changed() {
 /// createNewBlock + all BlockTemplate read methods: getBlockHeader, getBlock,
 /// getTxFees, getTxSigops, getCoinbaseTx, getCoinbaseMerklePath.
 #[tokio::test]
+#[serial_test::parallel]
 async fn mining_block_template_inspection() {
     let path = unix_socket_path();
     let rpc_network = connect_unix_stream(path).await;
@@ -319,6 +326,8 @@ async fn mining_block_template_inspection() {
 
 /// waitNext (short timeout), interruptWait, submitSolution (garbage), destroy.
 #[tokio::test]
+// Serialized because submitSolution behavior depends on current chain tip.
+#[serial_test::serial]
 async fn mining_block_template_lifecycle() {
     let path = unix_socket_path();
     let rpc_network = connect_unix_stream(path).await;
@@ -367,6 +376,8 @@ async fn mining_block_template_lifecycle() {
 
 /// checkBlock with a template block payload, and interrupt.
 #[tokio::test]
+// Serialized because interrupt() can affect other in-flight mining waits.
+#[serial_test::serial]
 async fn mining_check_block_and_interrupt() {
     let path = unix_socket_path();
     let rpc_network = connect_unix_stream(path).await;
